@@ -1,0 +1,33 @@
+# Secrets. BOMB_USERID goes here; must never reach the remote.
+.env
+
+# The bomb binary itself is per-student and contains a baked-in password.
+bomb
+
+# Compiled shim. Rebuild from source with `make -C shim`.
+shim/libbombshim.so
+*.so
+*.o
+
+# Submission log captures the exact HTTP requests the bomb tried to send,
+# including userid + password in the query string. Do not publish.
+shim/submissions.log
+
+# Per-user analysis artifacts — regenerable via objdump/strings.
+work/
+
+# The write-up and the answer file both reference a specific bomb instance.
+blog.md
+solutions.txt
+
+# Editor / tooling metadata.
+.claude/
+.vscode/
+
+# Python bytecode from the fake grader.
+__pycache__/
+*.pyc
+
+# Shell and editor swap files.
+*.swp
+*~
