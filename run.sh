@@ -32,8 +32,9 @@ fi
 
 make -s -C shim libbombshim.so
 
-if ! ss -tln 2>/dev/null | grep -q ':27054\b'; then
-    echo "[run.sh] starting fake grader in background..."
+SHIM_PORT="${BOMB_SHIM_PORT:-27054}"
+if ! ss -tln 2>/dev/null | grep -q ":${SHIM_PORT}\b"; then
+    echo "[run.sh] starting fake grader in background on port ${SHIM_PORT}..."
     python3 shim/fake_server.py &
     SRV_PID=$!
     trap 'kill "$SRV_PID" 2>/dev/null || true' EXIT

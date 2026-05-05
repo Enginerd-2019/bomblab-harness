@@ -16,7 +16,10 @@ import sys
 import os
 
 HOST = "127.0.0.1"
-PORT = 27054
+# Port the bomb dials. The course-issued bomb hardcodes 27054 (htons(0xae69)
+# in init_driver). The demo bomb shipped in this repo uses 12345. Override
+# with BOMB_SHIM_PORT when running against a bomb that uses something else.
+PORT = int(os.environ.get("BOMB_SHIM_PORT", 27054))
 LOGFILE = os.environ.get("BOMB_SHIM_LOG", "shim/submissions.log")
 
 # Headers end with blank line (\r\n\r\n). Body is literally "OK" with NO trailing

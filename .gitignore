@@ -2,7 +2,8 @@
 .env
 
 # The bomb binary itself is per-student and contains a baked-in password.
-bomb
+# (The demo bomb under demo-bomb/ is intentionally checked in — see README.)
+/bomb
 
 # Compiled shim. Rebuild from source with `make -C shim`.
 shim/libbombshim.so
@@ -17,8 +18,8 @@ shim/submissions.log
 work/
 
 # The write-up and the answer file both reference a specific bomb instance.
-blog.md
-solutions.txt
+./blog.md
+./solutions.txt
 
 # Editor / tooling metadata.
 .claude/

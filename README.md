@@ -8,6 +8,14 @@ binary, the write-up, and anything that identifies a specific bomb instance
 (userid, submission logs) are either gitignored or externalized to a `.env`
 file. Bring your own bomb.
 
+A standalone **demo bomb** lives under [`demo-bomb/`](demo-bomb/) so the
+harness can be exercised end-to-end without a real course-issued binary.
+It is **not** the bomb that the [blog post](blog.md) walks through — that
+one stays out of the repo for the reasons listed in *Security notes*. The
+demo bomb is built from the open CS:APP sources (Bryant & O'Hallaron) with
+fake server/userid values baked in, and exists purely so a reader can see
+the shim and fake grader work. See [Demo bomb](#demo-bomb) below.
+
 ## What this does
 
 The bomb normally:
@@ -32,27 +40,46 @@ Nothing in the bomb binary is patched.
 ## Prerequisites
 
 - Linux with `gcc`, `make`, `python3`, and `ss` (from `iproute2`).
-- Your bomb binary, placed at the project root as `./bomb`.
+  macOS won't work as-is — `LD_PRELOAD` is glibc-specific, and Apple's
+  `DYLD_INSERT_LIBRARIES` equivalent is blocked by SIP for most binaries.
+- A bomb binary at the project root as `./bomb`. If you don't have one,
+  use the [demo bomb](#demo-bomb) shipped in this repo.
 
 ## Setup
 
-1. Copy the env template:
+`.env.example` ships pre-configured for the [demo bomb](#demo-bomb), so
+the fastest path to seeing the harness work end-to-end on a fresh clone is:
+
+```sh
+cp .env.example .env
+cp demo-bomb/bomb ./bomb
+./run.sh demo-bomb/solution.txt
+```
+
+### Switching to your own bomb
+
+1. Copy the env template if you haven't already:
 
    ```sh
    cp .env.example .env
    ```
 
-2. Open `.env` and set `BOMB_USERID` to match the userid baked into your
-   bomb. You can find it with any of:
+2. Edit `.env`:
+   - Set `BOMB_USERID` to the hostname your bomb's `initialize_bomb()`
+     expects. Despite the variable name, this is what the shim makes
+     `gethostname()` return — for a course-issued bomb that value
+     happens to equal the `userid` string baked into `.data`. Recover it
+     from your binary with:
 
-   ```sh
-   strings bomb | head
-   objdump -t bomb | grep '\buserid\b'        # gives the address
-   objdump -s -j .data bomb | less            # look at that address
-   ```
+     ```sh
+     strings bomb | head
+     objdump -t bomb | grep '\buserid\b'        # gives the address
+     objdump -s -j .data bomb | less            # look at that address
+     ```
 
-   The hostcheck is `strcasecmp`-based, so case does not matter, but the
-   value must otherwise be exact.
+     The hostcheck is `strcasecmp`-based, so case does not matter, but
+     the value must otherwise be exact.
+   - Comment out `BOMB_SHIM_PORT` so the course-default `27054` is used.
 
 3. Drop your bomb binary at `./bomb`:
 
@@ -64,15 +91,22 @@ Nothing in the bomb binary is patched.
 ## Running
 
 ```sh
-./run.sh                   # interactive
-./run.sh solutions.txt     # batch: one phase answer per line
+./run.sh                   # interactive: type each phase answer at the prompt
+./run.sh solutions.txt     # batch: one answer per line, in order
 ```
+
+Solutions-file format: one phase answer per line, phase 1 on line 1
+through phase 6 on line 6. To also arm the secret phase, end phase 4's
+line with a space and the literal string `DrEvil`, and put the secret
+phase's answer on line 7. See [`demo-bomb/solution.txt`](demo-bomb/solution.txt)
+for a worked example.
 
 `run.sh` will:
 
 - source `.env` with auto-export so the shim sees `BOMB_USERID`
 - build `shim/libbombshim.so` if it is missing or out of date
-- start `shim/fake_server.py` on `127.0.0.1:27054` if nothing is listening
+- start `shim/fake_server.py` on `127.0.0.1:$BOMB_SHIM_PORT` (defaulting
+  to `27054`) if nothing is listening on that port already
 - launch the bomb with `LD_PRELOAD` pointing at the shim
 
 Submissions the bomb tries to send are appended to `shim/submissions.log`
@@ -102,6 +136,52 @@ Submissions the bomb tries to send are appended to `shim/submissions.log`
 
 ## Why port 27054?
 
-It is not configurable. The port is `htons(0xae69)` in the bomb's
-`init_driver`, and changing it would require patching the binary. The fake
-server matches what the bomb expects.
+It is not configurable *in the bomb*. The port is `htons(0xae69)` in the
+course-issued bomb's `init_driver`, and changing it would require patching
+the binary. The fake server defaults to `27054` to match.
+
+If you happen to be running a bomb that uses a different port (the demo
+bomb in this repo uses `12345`), set `BOMB_SHIM_PORT` in `.env` and both
+`fake_server.py` and `run.sh` will pick it up.
+
+## Demo bomb
+
+[`demo-bomb/bomb`](demo-bomb/bomb) is a self-contained, **non-course**
+binary built from the public CS:APP bomb sources with deliberately fake
+values:
+
+- `host_table[]`: `demohost.changeme.edu`, `demohost`, `localhost`
+- baked-in `userid`: `demouser`
+- grading host:port: `changeme.edu:12345`
+- `bomb_id`: `1`, `LABID`: `f12`
+- phase variants: `aaaaaa` (deterministic, so the canonical solution is
+  always the one in [`demo-bomb/solution.txt`](demo-bomb/solution.txt))
+
+Nothing in it ties to a real student or a real grading server, and the
+solution is committed alongside it. **It is a demonstration target for the
+shim, nothing more.** If you want to actually solve a bomb the way the
+blog post describes, drop your own course-issued binary at `./bomb`; the
+demo bomb under `demo-bomb/` is independent of that path.
+
+To run it (the shipped `.env.example` is already configured for this
+case — back up any existing `.env` first if you have one, since `cp`
+will overwrite it):
+
+```sh
+cp .env.example .env
+cp demo-bomb/bomb ./bomb
+./run.sh demo-bomb/solution.txt
+```
+
+Expected output ends with:
+
+```
+Curses, you've found the secret phase!
+But finding it and solving it are quite different...
+Wow! You've defused the secret stage!
+Congratulations! You've defused the bomb!
+Your instructor has been notified and will verify your solution.
+```
+
+`shim/submissions.log` will then contain seven `GET /csapp/submitr.pl/...`
+lines (one per defused phase + secret), all carrying `userid=demouser`.
